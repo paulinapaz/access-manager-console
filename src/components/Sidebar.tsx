@@ -1,78 +1,109 @@
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { useStore } from '@/store/useStore';
-import {
-  AssignmentsIcon,
-  GroupsIcon,
-  ServiceUserIcon,
-  UsersIcon,
-} from '@/lib/icons';
-import type { ReactNode } from 'react';
+import { ChevronDownIcon, ChevronUpIcon, ExpandPanelIcon, CollapsePanelIcon } from '@/lib/icons';
 
 interface NavItem {
   to: string;
   label: string;
-  icon: ReactNode;
-  count: number;
+}
+
+interface NavSectionData {
+  id: string;
+  title: string;
+  items: NavItem[];
 }
 
 export function Sidebar() {
-  const userCount = useStore((s) => s.users.length);
-  const serviceUserCount = useStore((s) => s.serviceUsers.length);
-  const groupCount = useStore((s) => s.groups.length);
-  const assignmentCount = useStore((s) => s.assignments.length);
+  const [collapsed, setCollapsed] = useState(false);
 
-  const directory: NavItem[] = [
-    { to: '/users', label: 'Users', icon: <UsersIcon />, count: userCount },
-    { to: '/service-users', label: 'Service users', icon: <ServiceUserIcon />, count: serviceUserCount },
-    { to: '/groups', label: 'Groups', icon: <GroupsIcon />, count: groupCount },
-  ];
-  const access: NavItem[] = [
-    { to: '/assignments', label: 'Assignments', icon: <AssignmentsIcon />, count: assignmentCount },
+  const sections: NavSectionData[] = [
+    {
+      id: 'directory',
+      title: 'Directory',
+      items: [
+        { to: '/users', label: 'Users' },
+        { to: '/service-users', label: 'Service users' },
+        { to: '/groups', label: 'Groups' },
+      ],
+    },
+    {
+      id: 'access',
+      title: 'Access Controls',
+      items: [
+        { to: '/roles', label: 'Roles' },
+        { to: '/assignments', label: 'Assignments' },
+      ],
+    },
   ];
 
   return (
-    <aside className="sidebar">
-      <div className="brand">
-        <div className="brand-mark">AM</div>
-        <div className="brand-text">
-          <div className="brand-title">Access Manager</div>
-          <div className="brand-sub">Acme Corporation</div>
+    <aside className={`spoke ${collapsed ? 'collapsed' : ''}`}>
+      <div className="spoke-clip">
+        <div className="spoke-inner">
+          <div className="spoke-header">
+            <h2 className="spoke-title">Access Manager</h2>
+          </div>
+
+          <div className="spoke-scroll">
+            <nav aria-label="Access Manager navigation">
+              {sections.map((section, i) => (
+                <NavSection key={section.id} section={section} defaultOpen={i === 0} />
+              ))}
+            </nav>
+          </div>
         </div>
       </div>
 
-      <nav className="nav">
-        <NavSection title="Directory" items={directory} />
-        <NavSection title="Access Controls" items={access} />
-      </nav>
-
-      <div className="sidebar-footer">
-        <div className="user-chip">
-          <div className="avatar">PP</div>
-          <div>
-            <div className="user-chip-name">Paulina Paz</div>
-            <div className="user-chip-role">Account Administrator</div>
-          </div>
-        </div>
+      <div className="spoke-toggle-wrap">
+        <button
+          type="button"
+          className="spoke-toggle"
+          onClick={() => setCollapsed((c) => !c)}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-expanded={!collapsed}
+          aria-controls="spoke-panel"
+        >
+          {collapsed ? <ExpandPanelIcon /> : <CollapsePanelIcon />}
+        </button>
+        <span className="spoke-tooltip" role="tooltip" aria-hidden="true">
+          {collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        </span>
       </div>
     </aside>
   );
 }
 
-function NavSection({ title, items }: { title: string; items: NavItem[] }) {
+function NavSection({ section, defaultOpen }: { section: NavSectionData; defaultOpen: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const sectionId = `spoke-section-${section.id}`;
+
   return (
-    <div>
-      <div className="nav-section-title">{title}</div>
-      {items.map((it) => (
-        <NavLink
-          key={it.to}
-          to={it.to}
-          className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-        >
-          {it.icon}
-          <span>{it.label}</span>
-          <span className="badge">{it.count}</span>
-        </NavLink>
-      ))}
+    <div className="spoke-section">
+      <button
+        type="button"
+        className="spoke-section-header"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-controls={sectionId}
+      >
+        <span className="spoke-section-title">{section.title}</span>
+        {open
+          ? <ChevronUpIcon className="icon spoke-section-caret" />
+          : <ChevronDownIcon className="icon spoke-section-caret" />}
+      </button>
+
+      <div id={sectionId} className="spoke-section-items" data-open={open}>
+        {section.items.map((it) => (
+          <NavLink
+            key={it.to}
+            to={it.to}
+            end
+            className={({ isActive }) => `spoke-link ${isActive ? 'active' : ''}`}
+          >
+            <span className="spoke-link-label">{it.label}</span>
+          </NavLink>
+        ))}
+      </div>
     </div>
   );
 }

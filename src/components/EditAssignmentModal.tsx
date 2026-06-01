@@ -1,28 +1,38 @@
 import { useState } from 'react';
 import { useStore } from '@/store/useStore';
 import { toast } from '@/store/useToast';
-import { ROLES_BY_PRODUCT, SCOPES } from '@/data/products';
+import { SCOPES } from '@/data/products';
 import { principalLabel, principalTypeLabel, getPrincipal } from '@/lib/lookups';
-import type { Assignment } from '@/types';
-import { Modal } from './Modal';
+import type { Assignment, AssignmentActivation } from '@/types';
+import { Drawer } from './Drawer';
+import { RolePicker } from './RolePicker';
 import { ScopePicker } from './ScopePicker';
+import { AssignmentConditions } from './AssignmentConditions';
 
 interface EditAssignmentModalProps {
   assignment: Assignment;
   onClose: () => void;
 }
 
+type Tab = 'access' | 'conditions';
+
 export function EditAssignmentModal({ assignment, onClose }: EditAssignmentModalProps) {
   const updateAssignment = useStore((s) => s.updateAssignment);
+  const allRoles = useStore((s) => s.roles);
   const users = useStore((s) => s.users);
   const serviceUsers = useStore((s) => s.serviceUsers);
   const groups = useStore((s) => s.groups);
 
-  const [role, setRole] = useState(assignment.role);
+  const [tab, setTab] = useState<Tab>('access');
+  const [roleIds, setRoleIds] = useState<string[]>(assignment.roleIds.slice());
   const [scopeIds, setScopeIds] = useState(assignment.scopeIds.slice());
+  const [activation, setActivation] = useState<AssignmentActivation>({
+    ...assignment.activation,
+    conditions: assignment.activation.conditions.map((c) => ({ ...c })),
+  });
 
   const productScopes = SCOPES.filter((s) => s.product === assignment.product);
-  const productRoles = ROLES_BY_PRODUCT[assignment.product];
+  const productRoles = allRoles.filter((r) => r.product === assignment.product);
   const principal = getPrincipal(
     assignment.principalType,
     assignment.principalId,
@@ -33,25 +43,28 @@ export function EditAssignmentModal({ assignment, onClose }: EditAssignmentModal
   const pLabel = principalLabel(assignment.principalType, principal);
 
   function handleSubmit() {
-    if (scopeIds.length === 0) return toast('Select at least one scope', 'error');
-    updateAssignment(assignment.id, { role, scopeIds });
+    if (roleIds.length === 0) {
+      setTab('access');
+      return toast('Select at least one role', 'error');
+    }
+    if (scopeIds.length === 0) {
+      setTab('access');
+      return toast('Select at least one scope', 'error');
+    }
+    updateAssignment(assignment.id, { roleIds, scopeIds, activation });
     toast('Assignment updated', 'success');
     onClose();
   }
 
   return (
-    <Modal
+    <Drawer
       title="Edit assignment"
       onClose={onClose}
       size="lg"
       footer={
         <div className="flex gap-8">
-          <button className="btn" type="button" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="btn btn-primary" type="button" onClick={handleSubmit}>
-            Save changes
-          </button>
+          <button className="btn" type="button" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" type="button" onClick={handleSubmit}>Save changes</button>
         </div>
       }
     >
@@ -77,21 +90,43 @@ export function EditAssignmentModal({ assignment, onClose }: EditAssignmentModal
         </div>
       </div>
 
-      <div className="label-text" style={{ marginBottom: 6 }}>Role</div>
-      <select
-        className="select"
-        value={role}
-        onChange={(e) => setRole(e.target.value)}
-      >
-        {productRoles.map((r) => (
-          <option key={r} value={r}>{r}</option>
-        ))}
-      </select>
+      <div className="tabs" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'access'}
+          className={`tab ${tab === 'access' ? 'active' : ''}`}
+          onClick={() => setTab('access')}
+        >
+          Access
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'conditions'}
+          className={`tab ${tab === 'conditions' ? 'active' : ''}`}
+          onClick={() => setTab('conditions')}
+        >
+          Conditions
+        </button>
+      </div>
 
-      <div className="section-divider" />
+      {tab === 'access' ? (
+        <>
+          <div className="label-text" style={{ marginBottom: 6 }}>Roles</div>
+          <div className="help" style={{ marginBottom: 8 }}>
+            All selected roles apply to the scopes below.
+          </div>
+          <RolePicker roles={productRoles} value={roleIds} onChange={setRoleIds} />
 
-      <div className="label-text" style={{ marginBottom: 6 }}>Scopes</div>
-      <ScopePicker scopes={productScopes} value={scopeIds} onChange={setScopeIds} />
-    </Modal>
+          <div className="section-divider" />
+
+          <div className="label-text" style={{ marginBottom: 6 }}>Scopes</div>
+          <ScopePicker scopes={productScopes} value={scopeIds} onChange={setScopeIds} />
+        </>
+      ) : (
+        <AssignmentConditions value={activation} onChange={setActivation} />
+      )}
+    </Drawer>
   );
 }

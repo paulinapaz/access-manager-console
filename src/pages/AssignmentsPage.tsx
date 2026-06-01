@@ -3,12 +3,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '@/store/useStore';
 import { toast } from '@/store/useToast';
 import { confirmAction } from '@/store/useConfirm';
-import { dateOnly } from '@/lib/format';
+import { dateOnly, activationStatus, activationWindowLabel } from '@/lib/format';
 import {
   getPrincipal,
   principalLabel,
   principalSubLabel,
   principalTypeLabel,
+  roleName,
 } from '@/lib/lookups';
 import { PRODUCTS, SCOPES } from '@/data/products';
 import { PlusIcon } from '@/lib/icons';
@@ -33,6 +34,7 @@ const SCOPE_BY_ID = new Map<string, Scope>(SCOPES.map((s) => [s.id, s]));
 
 export function AssignmentsPage() {
   const assignments = useStore((s) => s.assignments);
+  const roles = useStore((s) => s.roles);
   const users = useStore((s) => s.users);
   const serviceUsers = useStore((s) => s.serviceUsers);
   const groups = useStore((s) => s.groups);
@@ -41,11 +43,14 @@ export function AssignmentsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const filter = parsePrincipalParam(searchParams.get('principal'));
+  const roleParam = searchParams.get('role');
 
   const [query, setQuery] = useState('');
   const [productFilter, setProductFilter] = useState<ProductId | ''>('');
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<Assignment | null>(null);
+
+  const rolesLabel = (a: Assignment) => a.roleIds.map((id) => roleName(roles, id)).join(', ');
 
   const filtered = useMemo(() => {
     let rows = assignments.slice();
@@ -53,6 +58,9 @@ export function AssignmentsPage() {
       rows = rows.filter(
         (a) => a.principalType === filter.type && a.principalId === filter.id,
       );
+    }
+    if (roleParam) {
+      rows = rows.filter((a) => a.roleIds.includes(roleParam));
     }
     if (productFilter) {
       rows = rows.filter((a) => a.product === productFilter);
@@ -66,17 +74,18 @@ export function AssignmentsPage() {
           .map((id) => SCOPE_BY_ID.get(id)?.name ?? '')
           .join(' ')
           .toLowerCase();
+        const roleNames = a.roleIds.map((id) => roleName(roles, id)).join(' ').toLowerCase();
         return (
           pName.includes(q) ||
           a.product.toLowerCase().includes(q) ||
-          a.role.toLowerCase().includes(q) ||
+          roleNames.includes(q) ||
           scopeNames.includes(q)
         );
       });
     }
     rows.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
     return rows;
-  }, [assignments, filter, productFilter, query, users, serviceUsers, groups]);
+  }, [assignments, filter, roleParam, productFilter, query, users, serviceUsers, groups, roles]);
 
   const filterPrincipal = filter
     ? getPrincipal(filter.type, filter.id, users, serviceUsers, groups)
@@ -87,7 +96,7 @@ export function AssignmentsPage() {
     <>
       <PageHeader
         title="Assignments"
-        subtitle="Each assignment grants a principal a role on a product, scoped to specific resources."
+        subtitle="Each assignment grants a principal one or more roles on a product, scoped to specific resources and gated by activation conditions."
         actions={
           <button className="btn btn-primary" onClick={() => setShowAdd(true)}>
             <PlusIcon /> Add assignment
@@ -100,6 +109,13 @@ export function AssignmentsPage() {
           <div className="filter-banner">
             <strong style={{ fontWeight: 600 }}>Filtered:</strong>
             {principalTypeLabel(filter.type)} = <strong>{filterLabel || 'Unknown'}</strong>
+            <button onClick={() => navigate('/assignments')}>Clear filter</button>
+          </div>
+        )}
+        {roleParam && (
+          <div className="filter-banner">
+            <strong style={{ fontWeight: 600 }}>Filtered:</strong>
+            Role = <strong>{roleName(roles, roleParam)}</strong>
             <button onClick={() => navigate('/assignments')}>Clear filter</button>
           </div>
         )}
@@ -136,8 +152,9 @@ export function AssignmentsPage() {
                   <th>Principal</th>
                   <th>Type</th>
                   <th>Product</th>
-                  <th>Role</th>
+                  <th>Roles</th>
                   <th>Scopes</th>
+                  <th>Status</th>
                   <th>Created</th>
                   <th className="actions-cell" />
                 </tr>
@@ -145,7 +162,7 @@ export function AssignmentsPage() {
               <tbody>
                 {filtered.length === 0 ? (
                   <EmptyRow
-                    colSpan={7}
+                    colSpan={8}
                     title="No assignments yet"
                     description={
                       <>
@@ -164,7 +181,7 @@ export function AssignmentsPage() {
                         const pLabel = principalLabel(a.principalType, p);
                         confirmAction({
                           title: 'Delete assignment?',
-                          message: `Revokes "${a.role}" on ${a.product} for ${pLabel}.`,
+                          message: `Revokes "${rolesLabel(a)}" on ${a.product} for ${pLabel}.`,
                           confirmText: 'Delete',
                           danger: true,
                           onConfirm: () => {
@@ -205,9 +222,11 @@ function AssignmentRow({ assignment: a, onEdit, onDelete }: AssignmentRowProps) 
   const users = useStore((s) => s.users);
   const serviceUsers = useStore((s) => s.serviceUsers);
   const groups = useStore((s) => s.groups);
+  const roles = useStore((s) => s.roles);
   const principal = getPrincipal(a.principalType, a.principalId, users, serviceUsers, groups);
   const pLabel = principalLabel(a.principalType, principal);
   const subLine = principalSubLabel(a.principalType, principal);
+  const status = activationStatus(a.activation);
 
   return (
     <tr>
@@ -221,8 +240,8 @@ function AssignmentRow({ assignment: a, onEdit, onDelete }: AssignmentRowProps) 
         </div>
       </td>
       <td>{principalTypeLabel(a.principalType)}</td>
-      <td><span className="pill product">{a.product}</span></td>
-      <td>{a.role}</td>
+      <td>{a.product}</td>
+      <td>{a.roleIds.map((id) => roleName(roles, id)).join(', ')}</td>
       <td>
         {a.scopeIds.map((id) => {
           const s = SCOPE_BY_ID.get(id);
@@ -232,6 +251,11 @@ function AssignmentRow({ assignment: a, onEdit, onDelete }: AssignmentRowProps) 
             </span>
           );
         })}
+      </td>
+      <td>
+        <span className={`pill act-${status}`} title={activationWindowLabel(a.activation)}>
+          {status}
+        </span>
       </td>
       <td className="cell-muted">{dateOnly(a.createdAt)}</td>
       <td className="actions-cell">

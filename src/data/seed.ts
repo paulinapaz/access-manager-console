@@ -1,10 +1,21 @@
 import type {
   Assignment,
+  AssignmentActivation,
   Group,
   IdpSyncCandidate,
+  ProductId,
   ServiceUser,
   User,
 } from '@/types';
+import { roleId } from '@/data/products';
+
+/** Always-on activation: no window, no conditions. */
+const always: AssignmentActivation = { validFrom: null, validUntil: null, conditions: [] };
+
+/** Helper to reference one or more system roles by name for a product. */
+function roles(product: ProductId, ...names: string[]): string[] {
+  return names.map((n) => roleId(product, n));
+}
 
 export const SEED_USERS: User[] = [
   { id: 'u1',  username: 'jsmith',     name: 'Jane Smith',      email: 'jane.smith@acme.com',  status: 'Active',  type: 'IDP',    lastActive: '2026-05-08T08:14:00Z' },
@@ -38,21 +49,25 @@ export const SEED_GROUPS: Group[] = [
 ];
 
 export const SEED_ASSIGNMENTS: Assignment[] = [
-  { id: 'a1',  principalType: 'user',         principalId: 'u1',  product: 'CertCentral',     role: 'Manager',             scopeIds: ['sc-cc-1'],                                  createdAt: '2026-04-12T10:00:00Z' },
-  { id: 'a2',  principalType: 'user',         principalId: 'u1',  product: 'DigiCert DNS',    role: 'Administrator',       scopeIds: ['sc-dns-1', 'sc-dns-2'],                     createdAt: '2026-04-12T10:05:00Z' },
-  { id: 'a3',  principalType: 'user',         principalId: 'u3',  product: 'Software Trust',  role: 'Lead',                scopeIds: ['sc-st-1', 'sc-st-3'],                       createdAt: '2026-04-15T14:22:00Z' },
-  { id: 'a4',  principalType: 'user',         principalId: 'u4',  product: 'Trust Lifecycle', role: 'Certificate Manager', scopeIds: ['sc-tl-1'],                                  createdAt: '2026-04-18T09:15:00Z' },
-  { id: 'a5',  principalType: 'user',         principalId: 'u7',  product: 'CertCentral',     role: 'Standard User',       scopeIds: ['sc-cc-2'],                                  createdAt: '2026-04-21T11:00:00Z' },
-  { id: 'a6',  principalType: 'user',         principalId: 'u9',  product: 'Software Trust',  role: 'Developer',           scopeIds: ['sc-st-2', 'sc-st-5'],                       createdAt: '2026-04-22T16:30:00Z' },
-  { id: 'a7',  principalType: 'user',         principalId: 'u10', product: 'Trust Lifecycle', role: 'Viewer',              scopeIds: ['sc-tl-1', 'sc-tl-2'],                       createdAt: '2026-04-25T10:45:00Z' },
-  { id: 'a8',  principalType: 'group',        principalId: 'g1',  product: 'CertCentral',     role: 'Standard User',       scopeIds: ['sc-cc-1'],                                  createdAt: '2026-04-10T08:00:00Z' },
-  { id: 'a9',  principalType: 'group',        principalId: 'g1',  product: 'Software Trust',  role: 'Developer',           scopeIds: ['sc-st-1', 'sc-st-2'],                       createdAt: '2026-04-10T08:05:00Z' },
-  { id: 'a10', principalType: 'group',        principalId: 'g2',  product: 'CertCentral',     role: 'Administrator',       scopeIds: ['sc-cc-1', 'sc-cc-2', 'sc-cc-3', 'sc-cc-4'], createdAt: '2026-04-11T09:30:00Z' },
-  { id: 'a11', principalType: 'group',        principalId: 'g2',  product: 'Trust Lifecycle', role: 'Manager',             scopeIds: ['sc-tl-1', 'sc-tl-2'],                       createdAt: '2026-04-11T09:35:00Z' },
-  { id: 'a12', principalType: 'group',        principalId: 'g4',  product: 'DigiCert DNS',    role: 'Administrator',       scopeIds: ['sc-dns-1', 'sc-dns-2', 'sc-dns-3', 'sc-dns-4'], createdAt: '2026-04-13T12:00:00Z' },
-  { id: 'a13', principalType: 'service_user', principalId: 'sa1', product: 'Software Trust',  role: 'Build Engineer',      scopeIds: ['sc-st-1', 'sc-st-2', 'sc-st-3'],            createdAt: '2026-04-14T15:20:00Z' },
-  { id: 'a14', principalType: 'service_user', principalId: 'sa2', product: 'DigiCert DNS',    role: 'Administrator',       scopeIds: ['sc-dns-1', 'sc-dns-2'],                     createdAt: '2026-04-16T11:10:00Z' },
-  { id: 'a15', principalType: 'service_user', principalId: 'sa3', product: 'CertCentral',     role: 'Standard User',       scopeIds: ['sc-cc-5', 'sc-cc-6'],                       createdAt: '2026-04-19T13:40:00Z' },
+  { id: 'a1',  principalType: 'user',         principalId: 'u1',  product: 'CertCentral',     roleIds: roles('CertCentral', 'Manager'),                    scopeIds: ['sc-cc-1'],                                  activation: always, createdAt: '2026-04-12T10:00:00Z' },
+  // Expired window — access lapsed on 2026-05-15
+  { id: 'a2',  principalType: 'user',         principalId: 'u1',  product: 'DigiCert DNS',    roleIds: roles('DigiCert DNS', 'Administrator'),             scopeIds: ['sc-dns-1', 'sc-dns-2'],                     activation: { validFrom: null, validUntil: '2026-05-15T00:00:00Z', conditions: [] }, createdAt: '2026-04-12T10:05:00Z' },
+  // Multi-role assignment
+  { id: 'a3',  principalType: 'user',         principalId: 'u3',  product: 'Software Trust',  roleIds: roles('Software Trust', 'Manager', 'Signer'),       scopeIds: ['sc-st-1', 'sc-st-3'],                       activation: always, createdAt: '2026-04-15T14:22:00Z' },
+  // Scheduled — starts 2026-07-01
+  { id: 'a4',  principalType: 'user',         principalId: 'u4',  product: 'Trust Lifecycle', roleIds: roles('Trust Lifecycle', 'User and certificate manager'), scopeIds: ['sc-tl-1'],                             activation: { validFrom: '2026-07-01T00:00:00Z', validUntil: null, conditions: [] }, createdAt: '2026-04-18T09:15:00Z' },
+  { id: 'a5',  principalType: 'user',         principalId: 'u7',  product: 'CertCentral',     roleIds: roles('CertCentral', 'Standard User'),              scopeIds: ['sc-cc-2'],                                  activation: always, createdAt: '2026-04-21T11:00:00Z' },
+  { id: 'a6',  principalType: 'user',         principalId: 'u9',  product: 'Software Trust',  roleIds: roles('Software Trust', 'Signer'),                  scopeIds: ['sc-st-2', 'sc-st-5'],                       activation: always, createdAt: '2026-04-22T16:30:00Z' },
+  { id: 'a7',  principalType: 'user',         principalId: 'u10', product: 'Trust Lifecycle', roleIds: roles('Trust Lifecycle', 'View only'),              scopeIds: ['sc-tl-1', 'sc-tl-2'],                       activation: always, createdAt: '2026-04-25T10:45:00Z' },
+  { id: 'a8',  principalType: 'group',        principalId: 'g1',  product: 'CertCentral',     roleIds: roles('CertCentral', 'Standard User'),              scopeIds: ['sc-cc-1'],                                  activation: always, createdAt: '2026-04-10T08:00:00Z' },
+  { id: 'a9',  principalType: 'group',        principalId: 'g1',  product: 'Software Trust',  roleIds: roles('Software Trust', 'Signer'),                  scopeIds: ['sc-st-1', 'sc-st-2'],                       activation: always, createdAt: '2026-04-10T08:05:00Z' },
+  { id: 'a10', principalType: 'group',        principalId: 'g2',  product: 'CertCentral',     roleIds: roles('CertCentral', 'Administrator'),              scopeIds: ['sc-cc-1', 'sc-cc-2', 'sc-cc-3', 'sc-cc-4'], activation: always, createdAt: '2026-04-11T09:30:00Z' },
+  { id: 'a11', principalType: 'group',        principalId: 'g2',  product: 'Trust Lifecycle', roleIds: roles('Trust Lifecycle', 'Manager'),                scopeIds: ['sc-tl-1', 'sc-tl-2'],                       activation: always, createdAt: '2026-04-11T09:35:00Z' },
+  { id: 'a12', principalType: 'group',        principalId: 'g4',  product: 'DigiCert DNS',    roleIds: roles('DigiCert DNS', 'Administrator'),             scopeIds: ['sc-dns-1', 'sc-dns-2', 'sc-dns-3', 'sc-dns-4'], activation: always, createdAt: '2026-04-13T12:00:00Z' },
+  // Conditional — only active while a change ticket is open
+  { id: 'a13', principalType: 'service_user', principalId: 'sa1', product: 'Software Trust',  roleIds: roles('Software Trust', 'Key manager'),             scopeIds: ['sc-st-1', 'sc-st-2', 'sc-st-3'],            activation: { validFrom: null, validUntil: null, conditions: [{ id: 'cond-a13-1', attribute: 'ticket.status', operator: 'equals', value: 'open' }] }, createdAt: '2026-04-14T15:20:00Z' },
+  { id: 'a14', principalType: 'service_user', principalId: 'sa2', product: 'DigiCert DNS',    roleIds: roles('DigiCert DNS', 'Administrator'),             scopeIds: ['sc-dns-1', 'sc-dns-2'],                     activation: always, createdAt: '2026-04-16T11:10:00Z' },
+  { id: 'a15', principalType: 'service_user', principalId: 'sa3', product: 'CertCentral',     roleIds: roles('CertCentral', 'Standard User'),              scopeIds: ['sc-cc-5', 'sc-cc-6'],                       activation: always, createdAt: '2026-04-19T13:40:00Z' },
 ];
 
 export const IDP_SYNC_POOL: IdpSyncCandidate[] = [

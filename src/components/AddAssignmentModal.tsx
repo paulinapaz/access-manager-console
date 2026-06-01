@@ -1,37 +1,61 @@
 import { useState } from 'react';
 import { useStore } from '@/store/useStore';
 import { toast } from '@/store/useToast';
-import { PRODUCTS, ROLES_BY_PRODUCT, SCOPES } from '@/data/products';
-import type { PrincipalRef, ProductId } from '@/types';
-import { Modal } from './Modal';
+import { PRODUCTS, SCOPES } from '@/data/products';
+import type { AssignmentActivation, PrincipalRef, ProductId } from '@/types';
+import { Drawer } from './Drawer';
 import { PrincipalPicker } from './PrincipalPicker';
+import { RolePicker } from './RolePicker';
 import { ScopePicker } from './ScopePicker';
+import { AssignmentConditions } from './AssignmentConditions';
 
 interface AddAssignmentModalProps {
   onClose: () => void;
   initialPrincipal?: PrincipalRef | null;
 }
 
+const EMPTY_ACTIVATION: AssignmentActivation = { validFrom: null, validUntil: null, conditions: [] };
+
+const STEP_LABELS = ['Principals', 'Product, roles & scopes', 'Conditions'] as const;
+
 export function AddAssignmentModal({ onClose, initialPrincipal }: AddAssignmentModalProps) {
   const addAssignments = useStore((s) => s.addAssignments);
+  const allRoles = useStore((s) => s.roles);
 
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [principals, setPrincipals] = useState<PrincipalRef[]>(
     initialPrincipal ? [initialPrincipal] : [],
   );
   const [product, setProduct] = useState<ProductId | null>(null);
-  const [role, setRole] = useState<string>('');
+  const [roleIds, setRoleIds] = useState<string[]>([]);
   const [scopeIds, setScopeIds] = useState<string[]>([]);
+  const [activation, setActivation] = useState<AssignmentActivation>(EMPTY_ACTIVATION);
 
   const productScopes = product ? SCOPES.filter((s) => s.product === product) : [];
-  const productRoles = product ? ROLES_BY_PRODUCT[product] : [];
+  const productRoles = product ? allRoles.filter((r) => r.product === product) : [];
+
+  function pickProduct(p: ProductId) {
+    if (product !== p) {
+      setProduct(p);
+      setRoleIds([]);
+      setScopeIds([]);
+    }
+  }
+
+  function goToAccess() {
+    if (principals.length === 0) return toast('Select at least one principal', 'error');
+    setStep(2);
+  }
+
+  function goToConditions() {
+    if (!product) return toast('Select a product', 'error');
+    if (roleIds.length === 0) return toast('Select at least one role', 'error');
+    if (scopeIds.length === 0) return toast('Select at least one scope', 'error');
+    setStep(3);
+  }
 
   function handleSubmit() {
-    if (principals.length === 0) return toast('Select at least one principal', 'error');
-    if (!product) return toast('Select a product', 'error');
-    if (!role) return toast('Select a role', 'error');
-    if (scopeIds.length === 0) return toast('Select at least one scope', 'error');
-
-    const { created, skipped } = addAssignments(principals, product, role, scopeIds);
+    const { created, skipped } = addAssignments(principals, product!, roleIds, scopeIds, activation);
     if (created === 0 && skipped > 0) {
       toast(`No new assignments — ${skipped} already existed.`, 'success');
     } else {
@@ -43,95 +67,95 @@ export function AddAssignmentModal({ onClose, initialPrincipal }: AddAssignmentM
     onClose();
   }
 
-  function pickProduct(p: ProductId) {
-    if (product !== p) {
-      setProduct(p);
-      setRole('');
-      setScopeIds([]);
-    }
-  }
+  const footer =
+    step === 1 ? (
+      <div className="flex gap-8">
+        <button className="btn" type="button" onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" type="button" onClick={goToAccess}>Next: Roles &amp; scopes</button>
+      </div>
+    ) : step === 2 ? (
+      <div className="flex gap-8">
+        <button className="btn" type="button" onClick={() => setStep(1)}>Back</button>
+        <button className="btn btn-primary" type="button" onClick={goToConditions}>Next: Conditions</button>
+      </div>
+    ) : (
+      <div className="flex gap-8">
+        <button className="btn" type="button" onClick={() => setStep(2)}>Back</button>
+        <button className="btn btn-primary" type="button" onClick={handleSubmit}>Create assignment</button>
+      </div>
+    );
 
   return (
-    <Modal
+    <Drawer
       title="Add assignment"
+      subtitle={`Step ${step} of 3 — ${STEP_LABELS[step - 1]}`}
       onClose={onClose}
       size="lg"
-      footer={
-        <div className="flex gap-8">
-          <button className="btn" type="button" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="btn btn-primary" type="button" onClick={handleSubmit}>
-            Create assignment
-          </button>
-        </div>
-      }
+      footer={footer}
     >
-      <div className="label-text" style={{ marginBottom: 6 }}>1 · Principals</div>
-      <div className="help" style={{ marginBottom: 8 }}>
-        Pick one or more users, service users, or groups. A separate assignment is created for each.
-      </div>
-      <PrincipalPicker value={principals} onChange={setPrincipals} />
-
-      <div className="section-divider" />
-
-      <div className="label-text" style={{ marginBottom: 6 }}>2 · Product</div>
-      <div className="help" style={{ marginBottom: 8 }}>
-        Roles and scopes are defined per product. To grant access to another product, create a separate assignment.
-      </div>
-      <div className="radio-group">
-        {PRODUCTS.map((p) => {
-          const checked = product === p.id;
-          return (
-            <label
-              key={p.id}
-              className={`radio-card ${checked ? 'checked' : ''}`}
-              onClick={() => pickProduct(p.id)}
-            >
-              <input
-                type="radio"
-                name="product"
-                checked={checked}
-                onChange={() => pickProduct(p.id)}
-              />
-              <div>
-                <div className="radio-title">{p.name}</div>
-                <div className="radio-sub">{p.description}</div>
-              </div>
-            </label>
-          );
-        })}
-      </div>
-
-      <div className="section-divider" />
-
-      <div className="label-text" style={{ marginBottom: 6 }}>3 · Role</div>
-      {!product ? (
-        <div className="help">Select a product first.</div>
-      ) : (
-        <select
-          className="select"
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-        >
-          <option value="">Select a role...</option>
-          {productRoles.map((r) => (
-            <option key={r} value={r}>{r}</option>
-          ))}
-        </select>
+      {step === 1 && (
+        <>
+          <div className="help" style={{ marginBottom: 8 }}>
+            Pick one or more users, service users, or groups. A separate assignment is created for each.
+          </div>
+          <PrincipalPicker value={principals} onChange={setPrincipals} />
+        </>
       )}
 
-      <div className="section-divider" />
+      {step === 2 && (
+        <>
+          <div className="label-text" style={{ marginBottom: 6 }}>Product</div>
+          <div className="help" style={{ marginBottom: 8 }}>
+            Roles and scopes are defined per product. To grant access to another product, create a separate assignment.
+          </div>
+          <div className="radio-group">
+            {PRODUCTS.map((p) => {
+              const checked = product === p.id;
+              return (
+                <label
+                  key={p.id}
+                  className={`radio-card ${checked ? 'checked' : ''}`}
+                  onClick={() => pickProduct(p.id)}
+                >
+                  <input type="radio" name="product" checked={checked} onChange={() => pickProduct(p.id)} />
+                  <div>
+                    <div className="radio-title">{p.name}</div>
+                    <div className="radio-sub">{p.description}</div>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
 
-      <div className="label-text" style={{ marginBottom: 6 }}>4 · Scopes</div>
-      <div className="help" style={{ marginBottom: 8 }}>
-        Pick one or more scopes that this role applies to. These are the resources you've configured for this product.
-      </div>
-      {!product ? (
-        <div className="help">Select a product first.</div>
-      ) : (
-        <ScopePicker scopes={productScopes} value={scopeIds} onChange={setScopeIds} />
+          <div className="section-divider" />
+
+          <div className="label-text" style={{ marginBottom: 6 }}>Roles</div>
+          <div className="help" style={{ marginBottom: 8 }}>
+            Grant one or more roles. All selected roles apply to the scopes chosen below.
+          </div>
+          {!product ? (
+            <div className="help">Select a product first.</div>
+          ) : (
+            <RolePicker roles={productRoles} value={roleIds} onChange={setRoleIds} />
+          )}
+
+          <div className="section-divider" />
+
+          <div className="label-text" style={{ marginBottom: 6 }}>Scopes</div>
+          <div className="help" style={{ marginBottom: 8 }}>
+            The resources these roles apply to.
+          </div>
+          {!product ? (
+            <div className="help">Select a product first.</div>
+          ) : (
+            <ScopePicker scopes={productScopes} value={scopeIds} onChange={setScopeIds} />
+          )}
+        </>
       )}
-    </Modal>
+
+      {step === 3 && (
+        <AssignmentConditions value={activation} onChange={setActivation} />
+      )}
+    </Drawer>
   );
 }

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useStore } from '@/store/useStore';
 import { toast } from '@/store/useToast';
-import { Modal } from './Modal';
+import { Drawer } from './Drawer';
 
 interface AddServiceUserModalProps {
   onClose: () => void;
@@ -28,7 +28,7 @@ export function AddServiceUserModal({ onClose }: AddServiceUserModalProps) {
   }
 
   return (
-    <Modal
+    <Drawer
       title="Add service user"
       onClose={onClose}
       footer={
@@ -75,6 +75,6 @@ export function AddServiceUserModal({ onClose }: AddServiceUserModalProps) {
           />
         </label>
       </form>
-    </Modal>
+    </Drawer>
   );
 }

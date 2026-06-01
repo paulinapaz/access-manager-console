@@ -43,13 +43,64 @@ export interface Scope {
   kind: string;
 }
 
+export type RoleType = 'Built-in' | 'Custom';
+
+/**
+ * A capability describes what can be accessed and which actions are permissible,
+ * in the architecture's `service_endpoint(s)_action(s)` form.
+ */
+export interface Capability {
+  id: string;
+  product: ProductId;
+  service: string;     // service endpoint, e.g. "certificates"
+  actions: string[];   // permissible actions, e.g. ["read", "issue", "revoke"]
+  description: string;
+}
+
+/** A capability granted to a role, narrowed to a chosen subset of its actions. */
+export interface CapabilityGrant {
+  capabilityId: string;
+  actions: string[];   // subset of the capability's available actions
+}
+
+/** A role is a product-scoped container of capability grants. */
+export interface Role {
+  id: string;
+  product: ProductId;
+  name: string;
+  description: string;
+  type: RoleType;          // Built-in = non-modifiable; Custom = user-defined
+  capabilities: CapabilityGrant[];
+}
+
+export type ConditionOperator = 'equals' | 'not_equals' | 'in' | 'exists';
+
+/** A single contextual condition gating when an assignment is active. */
+export interface AssignmentCondition {
+  id: string;
+  attribute: string;   // e.g. "ticket.status", "request.environment", "principal.shift"
+  operator: ConditionOperator;
+  value: string;       // for "in", a comma-separated list; ignored for "exists"
+}
+
+/**
+ * Rule-based activation for an assignment: an optional active window plus
+ * contextual conditions (all must hold) describing when the grant applies.
+ */
+export interface AssignmentActivation {
+  validFrom: string | null;   // ISO date, or null for "no start bound"
+  validUntil: string | null;  // ISO date, or null for "no end bound"
+  conditions: AssignmentCondition[];
+}
+
 export interface Assignment {
   id: string;
   principalType: PrincipalType;
   principalId: string;
   product: ProductId;
-  role: string;
+  roleIds: string[];          // one or more roles (all product-scoped)
   scopeIds: string[];
+  activation: AssignmentActivation;
   createdAt: string;
 }
 

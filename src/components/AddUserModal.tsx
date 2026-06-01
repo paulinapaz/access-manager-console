@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useStore } from '@/store/useStore';
 import { toast } from '@/store/useToast';
-import { Modal } from './Modal';
+import { Drawer } from './Drawer';
 
 interface AddUserModalProps {
   onClose: () => void;
@@ -39,7 +39,7 @@ export function AddUserModal({ onClose }: AddUserModalProps) {
   }
 
   return (
-    <Modal
+    <Drawer
       title="Add user"
       onClose={onClose}
       footer={
@@ -98,6 +98,6 @@ export function AddUserModal({ onClose }: AddUserModalProps) {
           Send invitation email so they can sign up
         </label>
       </form>
-    </Modal>
+    </Drawer>
   );
 }

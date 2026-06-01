@@ -1,3 +1,5 @@
+import type { AssignmentActivation } from '@/types';
+
 export function relTime(iso: string | null): string {
   if (!iso) return 'Never';
   const then = new Date(iso).getTime();
@@ -39,4 +41,26 @@ export function initials(name: string | undefined | null): string {
 
 export function uid(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+export type ActivationStatus = 'Active' | 'Scheduled' | 'Expired' | 'Conditional';
+
+/**
+ * Derives the effective status of an assignment from its activation rules.
+ * Window bounds take priority (expired/not-yet-started), then contextual
+ * conditions mark it as conditionally active, otherwise it is plainly active.
+ */
+export function activationStatus(a: AssignmentActivation, now: Date = new Date()): ActivationStatus {
+  if (a.validUntil && now > new Date(a.validUntil)) return 'Expired';
+  if (a.validFrom && now < new Date(a.validFrom)) return 'Scheduled';
+  if (a.conditions.length > 0) return 'Conditional';
+  return 'Active';
+}
+
+/** Short human summary of an activation window, e.g. "Until Jun 1, 2026". */
+export function activationWindowLabel(a: AssignmentActivation): string {
+  if (a.validFrom && a.validUntil) return `${dateOnly(a.validFrom)} – ${dateOnly(a.validUntil)}`;
+  if (a.validFrom) return `From ${dateOnly(a.validFrom)}`;
+  if (a.validUntil) return `Until ${dateOnly(a.validUntil)}`;
+  return 'No time limit';
 }

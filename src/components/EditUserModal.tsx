@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useStore } from '@/store/useStore';
 import { toast } from '@/store/useToast';
 import type { User, UserStatus } from '@/types';
-import { Modal } from './Modal';
+import { Drawer } from './Drawer';
 
 interface EditUserModalProps {
   user: User;
@@ -30,7 +30,7 @@ export function EditUserModal({ user, onClose }: EditUserModalProps) {
   }
 
   return (
-    <Modal
+    <Drawer
       title="Edit user"
       onClose={onClose}
       footer={
@@ -94,6 +94,6 @@ export function EditUserModal({ user, onClose }: EditUserModalProps) {
           </select>
         </label>
       </form>
-    </Modal>
+    </Drawer>
   );
 }

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useStore } from '@/store/useStore';
 import { toast } from '@/store/useToast';
 import type { ServiceUser, ServiceUserStatus } from '@/types';
-import { Modal } from './Modal';
+import { Drawer } from './Drawer';
 
 interface EditServiceUserModalProps {
   serviceUser: ServiceUser;
@@ -24,7 +24,7 @@ export function EditServiceUserModal({ serviceUser, onClose }: EditServiceUserMo
   }
 
   return (
-    <Modal
+    <Drawer
       title="Edit service user"
       onClose={onClose}
       footer={
@@ -78,6 +78,6 @@ export function EditServiceUserModal({ serviceUser, onClose }: EditServiceUserMo
           </select>
         </label>
       </form>
-    </Modal>
+    </Drawer>
   );
 }
