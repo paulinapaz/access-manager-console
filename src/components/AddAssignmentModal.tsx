@@ -21,6 +21,7 @@ const STEP_LABELS = ['Principals', 'Product, roles & scopes', 'Conditions'] as c
 export function AddAssignmentModal({ onClose, initialPrincipal }: AddAssignmentModalProps) {
   const addAssignments = useStore((s) => s.addAssignments);
   const allRoles = useStore((s) => s.roles);
+  const groups = useStore((s) => s.groups);
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [principals, setPrincipals] = useState<PrincipalRef[]>(
@@ -33,6 +34,17 @@ export function AddAssignmentModal({ onClose, initialPrincipal }: AddAssignmentM
 
   const productScopes = product ? SCOPES.filter((s) => s.product === product) : [];
   const productRoles = product ? allRoles.filter((r) => r.product === product) : [];
+
+  // Partition scopes that are selected and also exist as a principal group — surface the
+  // linkage so the admin can target the partition's *members* instead of (or as well as)
+  // scoping to its resources.
+  const selectedAsPrincipal = new Set(
+    principals.filter((p) => p.type === 'group').map((p) => p.id),
+  );
+  const linkedGroups = productScopes
+    .filter((s) => scopeIds.includes(s.id) && s.origin)
+    .map((s) => groups.find((g) => g.origin?.externalId === s.origin!.externalId))
+    .filter((g): g is NonNullable<typeof g> => Boolean(g) && !selectedAsPrincipal.has(g!.id));
 
   function pickProduct(p: ProductId) {
     if (product !== p) {
@@ -149,6 +161,31 @@ export function AddAssignmentModal({ onClose, initialPrincipal }: AddAssignmentM
             <div className="help">Select a product first.</div>
           ) : (
             <ScopePicker scopes={productScopes} value={scopeIds} onChange={setScopeIds} />
+          )}
+
+          {linkedGroups.length > 0 && (
+            <div className="help" style={{ marginTop: 8 }}>
+              {linkedGroups.length === 1
+                ? `“${linkedGroups[0].name}” is also a principal group (${linkedGroups[0].memberCount} members). `
+                : `${linkedGroups.length} selected scopes are also principal groups. `}
+              You can grant these roles to their members instead of (or as well as) scoping to the partition.{' '}
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => {
+                  setPrincipals([
+                    ...principals,
+                    ...linkedGroups.map((g) => ({ type: 'group' as const, id: g.id })),
+                  ]);
+                  toast(
+                    `Added ${linkedGroups.length} partition group${linkedGroups.length === 1 ? '' : 's'} to principals`,
+                    'success',
+                  );
+                }}
+              >
+                Add their members as principals
+              </button>
+            </div>
           )}
         </>
       )}

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '@/store/useStore';
 import { toast } from '@/store/useToast';
 import { confirmAction } from '@/store/useConfirm';
@@ -13,18 +14,33 @@ import { RowMenu } from '@/components/RowMenu';
 import { EmptyRow } from '@/components/EmptyRow';
 import { AddUserModal } from '@/components/AddUserModal';
 import { EditUserModal } from '@/components/EditUserModal';
+import { AddAssignmentModal } from '@/components/AddAssignmentModal';
 import type { User } from '@/types';
 
 export function UsersPage() {
   const users = useStore((s) => s.users);
+  const groups = useStore((s) => s.groups);
   const assignments = useStore((s) => s.assignments);
   const updateUser = useStore((s) => s.updateUser);
   const deleteUser = useStore((s) => s.deleteUser);
   const syncIdpUsers = useStore((s) => s.syncIdpUsers);
 
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const groupParam = searchParams.get('group');
+  const filterGroup = groupParam ? groups.find((g) => g.id === groupParam) ?? null : null;
+  const memberUserIds = useMemo(
+    () =>
+      new Set(
+        (filterGroup?.members ?? []).filter((m) => m.type === 'user').map((m) => m.id),
+      ),
+    [filterGroup],
+  );
+
   const [query, setQuery] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
+  const [addingFor, setAddingFor] = useState<User | null>(null);
 
   const assignmentCountById = useMemo(() => {
     const map = new Map<string, number>();
@@ -37,6 +53,7 @@ export function UsersPage() {
   }, [assignments]);
 
   const filtered = users.filter((u) => {
+    if (groupParam && !memberUserIds.has(u.id)) return false;
     const q = query.toLowerCase().trim();
     if (!q) return true;
     return (
@@ -96,6 +113,14 @@ export function UsersPage() {
       />
 
       <section className="content">
+        {groupParam && (
+          <div className="filter-banner">
+            <strong style={{ fontWeight: 600 }}>Filtered:</strong>
+            Members of <strong>{filterGroup?.name ?? 'Unknown group'}</strong>
+            <button onClick={() => navigate('/users')}>Clear filter</button>
+          </div>
+        )}
+
         <div className="card">
           <div className="card-header">
             <div className="card-header-left">
@@ -149,6 +174,7 @@ export function UsersPage() {
                         <td className="actions-cell">
                           <RowMenu
                             items={[
+                              { label: 'Add assignment', onClick: () => setAddingFor(u) },
                               { label: 'Edit user', onClick: () => setEditing(u) },
                               u.status !== 'Revoked'
                                 ? { label: 'Revoke access', danger: true, onClick: () => handleRevoke(u) }
@@ -175,6 +201,12 @@ export function UsersPage() {
 
       {showAdd && <AddUserModal onClose={() => setShowAdd(false)} />}
       {editing && <EditUserModal user={editing} onClose={() => setEditing(null)} />}
+      {addingFor && (
+        <AddAssignmentModal
+          onClose={() => setAddingFor(null)}
+          initialPrincipal={{ type: 'user', id: addingFor.id }}
+        />
+      )}
     </>
   );
 }

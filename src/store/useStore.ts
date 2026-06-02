@@ -6,7 +6,7 @@ import {
   SEED_SERVICE_USERS,
   SEED_USERS,
 } from '@/data/seed';
-import { SEED_ROLES } from '@/data/products';
+import { SCOPES, SEED_ROLES, productGroupsFromScopes } from '@/data/products';
 import { uid } from '@/lib/format';
 import type {
   Assignment,
@@ -71,7 +71,8 @@ interface State {
 export const useStore = create<State>((set, get) => ({
   users: SEED_USERS,
   serviceUsers: SEED_SERVICE_USERS,
-  groups: SEED_GROUPS,
+  // IDP/SCIM groups plus the product-partition groups synced from the scope catalog.
+  groups: [...SEED_GROUPS, ...productGroupsFromScopes(SCOPES, SEED_USERS)],
   roles: SEED_ROLES,
   assignments: SEED_ASSIGNMENTS,
   idpSyncPool: IDP_SYNC_POOL,

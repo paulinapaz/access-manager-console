@@ -1,4 +1,14 @@
-import type { Capability, CapabilityGrant, Product, ProductId, Role, Scope } from '@/types';
+import type {
+  Capability,
+  CapabilityGrant,
+  Group,
+  PrincipalRef,
+  Product,
+  ProductId,
+  Role,
+  Scope,
+  User,
+} from '@/types';
 
 export const PRODUCTS: Product[] = [
   { id: 'CertCentral',     name: 'CertCentral',     description: 'Public TLS certificate lifecycle' },
@@ -198,7 +208,28 @@ export const SEED_ROLES: Role[] = [
   ]),
 ];
 
-export const SCOPES: Scope[] = [
+/**
+ * The product-native partition that *also groups users* for each product
+ * (the overloaded "scope == group" construct). A scope whose `kind` matches
+ * its product's partition kind is both a resource scope and a principal group;
+ * `withPartitionOrigin` stamps it with a `ProductOrigin` so `productGroupsFromScopes`
+ * can materialize the linked group. Products absent here (e.g. DigiCert DNS) have
+ * scopes that do not group users — they stay scope-only.
+ */
+export const PARTITION_KIND: Partial<Record<ProductId, string>> = {
+  'CertCentral': 'Division',
+  'Software Trust': 'Team',
+  'Trust Lifecycle': 'Business Unit',
+};
+
+/** Stamp a `ProductOrigin` on a scope when its kind is its product's user-grouping partition. */
+function withPartitionOrigin(s: Scope): Scope {
+  return s.kind === PARTITION_KIND[s.product]
+    ? { ...s, origin: { product: s.product, kind: s.kind, externalId: s.id } }
+    : s;
+}
+
+const RAW_SCOPES: Scope[] = [
   // CertCentral
   { id: 'sc-cc-1', product: 'CertCentral', name: 'Engineering Division',     kind: 'Division' },
   { id: 'sc-cc-2', product: 'CertCentral', name: 'Sales & Marketing',        kind: 'Division' },
@@ -207,22 +238,67 @@ export const SCOPES: Scope[] = [
   { id: 'sc-cc-5', product: 'CertCentral', name: 'Production Sub-Account',   kind: 'Sub-Account' },
   { id: 'sc-cc-6', product: 'CertCentral', name: 'Staging Sub-Account',      kind: 'Sub-Account' },
 
-  // DigiCert DNS
+  // DigiCert DNS — DNS zones scope resources but do not group users (no partition kind).
   { id: 'sc-dns-1', product: 'DigiCert DNS', name: 'acme.com',               kind: 'DNS Zone' },
   { id: 'sc-dns-2', product: 'DigiCert DNS', name: 'acme.io',                kind: 'DNS Zone' },
   { id: 'sc-dns-3', product: 'DigiCert DNS', name: 'internal.acme.local',    kind: 'DNS Zone' },
   { id: 'sc-dns-4', product: 'DigiCert DNS', name: 'staging.acme.com',       kind: 'DNS Zone' },
 
-  // Software Trust
+  // Software Trust — Teams are the user-grouping partition; Projects are resources within them.
+  { id: 'sc-st-team-1', product: 'Software Trust', name: 'Platform Team',    kind: 'Team' },
+  { id: 'sc-st-team-2', product: 'Software Trust', name: 'Mobile Team',      kind: 'Team' },
   { id: 'sc-st-1', product: 'Software Trust', name: 'Mobile App Project',    kind: 'Project' },
   { id: 'sc-st-2', product: 'Software Trust', name: 'Backend Services',      kind: 'Project' },
   { id: 'sc-st-3', product: 'Software Trust', name: 'Desktop Client',        kind: 'Project' },
   { id: 'sc-st-4', product: 'Software Trust', name: 'Firmware Releases',     kind: 'Project' },
   { id: 'sc-st-5', product: 'Software Trust', name: 'CLI Tools',             kind: 'Project' },
 
-  // Trust Lifecycle
+  // Trust Lifecycle — Business Units are the user-grouping partition; CA accounts/profiles are resources within them.
+  { id: 'sc-tl-bu-1', product: 'Trust Lifecycle', name: 'Corporate IT',       kind: 'Business Unit' },
+  { id: 'sc-tl-bu-2', product: 'Trust Lifecycle', name: 'Manufacturing',      kind: 'Business Unit' },
   { id: 'sc-tl-1', product: 'Trust Lifecycle', name: 'Production CA',         kind: 'CA Account' },
   { id: 'sc-tl-2', product: 'Trust Lifecycle', name: 'Development CA',        kind: 'CA Account' },
   { id: 'sc-tl-3', product: 'Trust Lifecycle', name: 'IoT Device Profile',    kind: 'Profile' },
   { id: 'sc-tl-4', product: 'Trust Lifecycle', name: 'Workforce SSO Profile', kind: 'Profile' },
 ];
+
+export const SCOPES: Scope[] = RAW_SCOPES.map(withPartitionOrigin);
+
+/** Deterministic id for the group facet of a partition scope. */
+export function partitionGroupId(scopeId: string): string {
+  return `g-${scopeId}`;
+}
+
+/**
+ * Deterministic member set for a partition (no RNG, so the seed is stable across reloads).
+ * Picks a rotating window of users keyed off the partition's position.
+ */
+function partitionMembers(users: User[], index: number): PrincipalRef[] {
+  if (users.length === 0) return [];
+  const size = Math.min(3, users.length);
+  return Array.from({ length: size }, (_, k) => users[(index * 2 + k) % users.length]).map(
+    (u) => ({ type: 'user' as const, id: u.id }),
+  );
+}
+
+/**
+ * Sync routine: for every scope that is a product partition (has a `ProductOrigin`),
+ * materialize its membership facet as a `source: 'Product'` Group sharing that origin.
+ * This is the generalization of the hand-wired CertCentral Division example to all
+ * products' partitions. DNS zones produce no groups (scope-only).
+ */
+export function productGroupsFromScopes(scopes: Scope[], users: User[]): Group[] {
+  return scopes
+    .filter((s) => s.origin)
+    .map((s, i) => {
+      const members = partitionMembers(users, i);
+      return {
+        id: partitionGroupId(s.id),
+        name: `${s.product} · ${s.name}`,
+        memberCount: members.length,
+        source: 'Product' as const,
+        origin: s.origin,
+        members,
+      };
+    });
+}

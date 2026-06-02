@@ -31,6 +31,7 @@ export function Sidebar() {
       title: 'Access Controls',
       items: [
         { to: '/roles', label: 'Roles' },
+        { to: '/scopes', label: 'Scopes' },
         { to: '/assignments', label: 'Assignments' },
       ],
     },

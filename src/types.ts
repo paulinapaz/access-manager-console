@@ -28,12 +28,32 @@ export interface ServiceUser {
   lastActive: string | null;
 }
 
+/**
+ * Provenance for an object imported from a product's native partition
+ * (e.g. a CertCentral Division, a Software Trust Team, a TLM Business Unit).
+ *
+ * Products overload one construct to mean both a *scope* (the resource
+ * partition) and a *principal group* (its member users). The console
+ * normalizes that into separate Scope and Group objects; a shared
+ * `ProductOrigin` (same `product` + `externalId`) links the two facets
+ * back to the single product partition they came from.
+ */
+export interface ProductOrigin {
+  product: ProductId;
+  kind: string;        // the product's term for its partition, e.g. "Division", "Team", "Business Unit"
+  externalId: string;  // the product's id for the partition
+}
+
+export type GroupSource = 'IDP' | 'Product';
+
 export interface Group {
   id: string;
   name: string;
   memberCount: number;
-  source: 'IDP';
-  externalId?: string;
+  source: GroupSource;
+  externalId?: string;        // IDP/SCIM external id (when source === 'IDP')
+  origin?: ProductOrigin;     // product partition this group is the membership facet of (when source === 'Product')
+  members?: PrincipalRef[];   // explicit membership, when known
 }
 
 export interface Scope {
@@ -41,6 +61,7 @@ export interface Scope {
   product: ProductId;
   name: string;
   kind: string;
+  origin?: ProductOrigin;     // product partition this scope is the resource facet of
 }
 
 export type RoleType = 'Built-in' | 'Custom';

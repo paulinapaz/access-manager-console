@@ -3,6 +3,7 @@ import type {
   AssignmentActivation,
   Group,
   IdpSyncCandidate,
+  PrincipalRef,
   ProductId,
   ServiceUser,
   User,
@@ -38,15 +39,27 @@ export const SEED_SERVICE_USERS: ServiceUser[] = [
   { id: 'sa5', username: 'legacy-importer',  name: 'Legacy Importer',       description: 'One-off cert import service (deprecated)',              status: 'Revoked', type: 'Manual', lastActive: '2026-03-12T10:00:00Z' },
 ];
 
-export const SEED_GROUPS: Group[] = [
-  { id: 'g1', name: 'Engineering',       memberCount: 24, source: 'IDP', externalId: 'okta-eng-001' },
-  { id: 'g2', name: 'Security Team',     memberCount: 8,  source: 'IDP', externalId: 'okta-sec-002' },
-  { id: 'g3', name: 'Finance',           memberCount: 12, source: 'IDP', externalId: 'okta-fin-003' },
-  { id: 'g4', name: 'IT Operations',     memberCount: 16, source: 'IDP', externalId: 'okta-ito-004' },
-  { id: 'g5', name: 'Sales & Marketing', memberCount: 31, source: 'IDP', externalId: 'okta-sm-005' },
-  { id: 'g6', name: 'Mobile Dev Team',   memberCount: 9,  source: 'IDP', externalId: 'okta-mob-006' },
-  { id: 'g7', name: 'Compliance',        memberCount: 5,  source: 'IDP', externalId: 'okta-cmp-007' },
+/** Build user member refs from seed user ids. */
+const userMembers = (...ids: string[]): PrincipalRef[] => ids.map((id) => ({ type: 'user', id }));
+
+/**
+ * IDP / SCIM groups — membership owned by the identity provider (Okta). Member lists
+ * are mocked from the seed user pool; `memberCount` matches so the count shown on the
+ * Groups page agrees with the filtered Users view it links to. Product-native groups
+ * (the membership facet of product partitions) are not seeded here; they are generated
+ * from the scope catalog by `productGroupsFromScopes` and combined in the store.
+ */
+const SCIM_GROUPS: Array<Omit<Group, 'memberCount'> & { members: PrincipalRef[] }> = [
+  { id: 'g1', name: 'Engineering',       source: 'IDP', externalId: 'okta-eng-001', members: userMembers('u1', 'u3', 'u4', 'u9') },
+  { id: 'g2', name: 'Security Team',     source: 'IDP', externalId: 'okta-sec-002', members: userMembers('u6', 'u7') },
+  { id: 'g3', name: 'Finance',           source: 'IDP', externalId: 'okta-fin-003', members: userMembers('u8', 'u10') },
+  { id: 'g4', name: 'IT Operations',     source: 'IDP', externalId: 'okta-ito-004', members: userMembers('u4', 'u6', 'u9') },
+  { id: 'g5', name: 'Sales & Marketing', source: 'IDP', externalId: 'okta-sm-005', members: userMembers('u2', 'u7', 'u10') },
+  { id: 'g6', name: 'Mobile Dev Team',   source: 'IDP', externalId: 'okta-mob-006', members: userMembers('u1', 'u3') },
+  { id: 'g7', name: 'Compliance',        source: 'IDP', externalId: 'okta-cmp-007', members: userMembers('u5', 'u8') },
 ];
+
+export const SEED_GROUPS: Group[] = SCIM_GROUPS.map((g) => ({ ...g, memberCount: g.members.length }));
 
 export const SEED_ASSIGNMENTS: Assignment[] = [
   { id: 'a1',  principalType: 'user',         principalId: 'u1',  product: 'CertCentral',     roleIds: roles('CertCentral', 'Manager'),                    scopeIds: ['sc-cc-1'],                                  activation: always, createdAt: '2026-04-12T10:00:00Z' },

@@ -22,7 +22,8 @@ export function RolesPage() {
   const [productFilter, setProductFilter] = useState<ProductId | ''>('');
   const [typeFilter, setTypeFilter] = useState<RoleType | ''>('');
   const [showAdd, setShowAdd] = useState(false);
-  const [editing, setEditing] = useState<Role | null>(null);
+  // The role detail drawer. readOnly = opened via the name (view); false = opened via "Edit role".
+  const [opened, setOpened] = useState<{ role: Role; readOnly: boolean } | null>(null);
 
   // assignment usage count per role id
   const usageById = useMemo(() => {
@@ -120,11 +121,17 @@ export function RolesPage() {
                 ) : (
                   filtered.map((r) => {
                     const used = usageById.get(r.id) ?? 0;
-                    const isBuiltIn = r.type === 'Built-in';
                     return (
                       <tr key={r.id}>
                         <td>
-                          <div className="cell-strong">{r.name}</div>
+                          <button
+                            type="button"
+                            className="count-link"
+                            onClick={() => setOpened({ role: r, readOnly: true })}
+                            title="View role details"
+                          >
+                            {r.name}
+                          </button>
                           <div className="row-sub">{r.description}</div>
                         </td>
                         <td>{r.product}</td>
@@ -145,16 +152,14 @@ export function RolesPage() {
                           )}
                         </td>
                         <td className="actions-cell">
-                          <RowMenu
-                            items={
-                              isBuiltIn
-                                ? [{ label: 'View details', onClick: () => setEditing(r) }]
-                                : [
-                                    { label: 'Edit role', onClick: () => setEditing(r) },
-                                    { label: 'Delete role', danger: true, onClick: () => handleDelete(r) },
-                                  ]
-                            }
-                          />
+                          {r.type === 'Custom' && (
+                            <RowMenu
+                              items={[
+                                { label: 'Edit role', onClick: () => setOpened({ role: r, readOnly: false }) },
+                                { label: 'Delete role', danger: true, onClick: () => handleDelete(r) },
+                              ]}
+                            />
+                          )}
                         </td>
                       </tr>
                     );
@@ -167,7 +172,13 @@ export function RolesPage() {
       </section>
 
       {showAdd && <AddRoleModal onClose={() => setShowAdd(false)} />}
-      {editing && <EditRoleModal role={editing} onClose={() => setEditing(null)} />}
+      {opened && (
+        <EditRoleModal
+          role={opened.role}
+          readOnly={opened.readOnly}
+          onClose={() => setOpened(null)}
+        />
+      )}
     </>
   );
 }

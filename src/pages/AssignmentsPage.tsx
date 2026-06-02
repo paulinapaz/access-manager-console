@@ -44,6 +44,7 @@ export function AssignmentsPage() {
   const [searchParams] = useSearchParams();
   const filter = parsePrincipalParam(searchParams.get('principal'));
   const roleParam = searchParams.get('role');
+  const scopeParam = searchParams.get('scope');
 
   const [query, setQuery] = useState('');
   const [productFilter, setProductFilter] = useState<ProductId | ''>('');
@@ -61,6 +62,9 @@ export function AssignmentsPage() {
     }
     if (roleParam) {
       rows = rows.filter((a) => a.roleIds.includes(roleParam));
+    }
+    if (scopeParam) {
+      rows = rows.filter((a) => a.scopeIds.includes(scopeParam));
     }
     if (productFilter) {
       rows = rows.filter((a) => a.product === productFilter);
@@ -85,7 +89,7 @@ export function AssignmentsPage() {
     }
     rows.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
     return rows;
-  }, [assignments, filter, roleParam, productFilter, query, users, serviceUsers, groups, roles]);
+  }, [assignments, filter, roleParam, scopeParam, productFilter, query, users, serviceUsers, groups, roles]);
 
   const filterPrincipal = filter
     ? getPrincipal(filter.type, filter.id, users, serviceUsers, groups)
@@ -116,6 +120,13 @@ export function AssignmentsPage() {
           <div className="filter-banner">
             <strong style={{ fontWeight: 600 }}>Filtered:</strong>
             Role = <strong>{roleName(roles, roleParam)}</strong>
+            <button onClick={() => navigate('/assignments')}>Clear filter</button>
+          </div>
+        )}
+        {scopeParam && (
+          <div className="filter-banner">
+            <strong style={{ fontWeight: 600 }}>Filtered:</strong>
+            Scope = <strong>{SCOPE_BY_ID.get(scopeParam)?.name ?? 'Unknown'}</strong>
             <button onClick={() => navigate('/assignments')}>Clear filter</button>
           </div>
         )}

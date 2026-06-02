@@ -48,7 +48,10 @@ export function PrincipalPicker({ value, onChange }: PrincipalPickerProps) {
         type: 'group',
         id: g.id,
         label: g.name,
-        sub: `${g.memberCount} members · Group`,
+        sub:
+          g.source === 'Product'
+            ? `${g.memberCount} members · ${g.origin?.kind} — its members (the ${g.origin?.kind} itself is selectable as a scope)`
+            : `${g.memberCount} members · SCIM group`,
         hay: g.name,
       }),
     );

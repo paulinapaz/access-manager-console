@@ -676,6 +676,16 @@ input, select, textarea, button { font-size: 14px; font-family: inherit; }
 .btn-danger:hover { background: #fef2f2; }
 .btn-ghost { border-color: transparent; background: transparent; }
 .btn-ghost:hover { background: #f1f5f9; }
+.link-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: #2563eb;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.link-btn:hover { color: #1d4ed8; }
 .btn-sm { padding: 5px 10px; font-size: 12px; }
 .btn-icon {
   padding: 6px;

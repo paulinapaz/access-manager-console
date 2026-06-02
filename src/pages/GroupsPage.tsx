@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useStore } from '@/store/useStore';
 import { toast } from '@/store/useToast';
 import { confirmAction } from '@/store/useConfirm';
@@ -18,7 +18,6 @@ export function GroupsPage() {
   const assignments = useStore((s) => s.assignments);
   const deleteAssignmentsForPrincipal = useStore((s) => s.deleteAssignmentsForPrincipal);
 
-  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [addingFor, setAddingFor] = useState<Group | null>(null);
 
@@ -42,7 +41,7 @@ export function GroupsPage() {
     <>
       <PageHeader
         title="Groups"
-        subtitle="Synced from your identity provider via SCIM. Assign access to a group and all its members inherit it."
+        subtitle="Sourced from your identity provider (SCIM) or from a product partition (e.g. a CertCentral Division). Assign access to a group and all its members inherit it."
         actions={
           <button className="btn" onClick={() => toast('SCIM groups are up to date', 'success')}>
             <RefreshIcon /> Sync SCIM groups
@@ -67,14 +66,13 @@ export function GroupsPage() {
                   <th>Group</th>
                   <th>Members</th>
                   <th>Source</th>
-                  <th>Access assigned</th>
                   <th>Assignments</th>
                   <th className="actions-cell" />
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
-                  <EmptyRow colSpan={6} title="No groups match" />
+                  <EmptyRow colSpan={5} title="No groups match" />
                 ) : (
                   filtered.map((g) => {
                     const count = assignmentCountById.get(g.id) ?? 0;
@@ -85,21 +83,33 @@ export function GroupsPage() {
                             <PrincipalIcon type="group" name={g.name} />
                             <div>
                               <div className="cell-strong">{g.name}</div>
-                              <div className="row-sub">{g.externalId ?? ''}</div>
+                              <div className="row-sub">
+                                {g.source === 'Product'
+                                  ? `Linked to ${g.origin?.product} ${g.origin?.kind} · also a scope`
+                                  : g.externalId ?? ''}
+                              </div>
                             </div>
                           </div>
                         </td>
-                        <td>{g.memberCount} members</td>
-                        <td><span className="pill type-IDP">SCIM / IDP</span></td>
                         <td>
-                          {count > 0 ? (
-                            <span className="pill status-Active">
-                              <span className="dot" />Yes
+                          {g.members && g.members.length > 0 ? (
+                            <Link
+                              className="count-link"
+                              to={{ pathname: '/users', search: `?${new URLSearchParams({ group: g.id })}` }}
+                            >
+                              {g.memberCount} members
+                            </Link>
+                          ) : (
+                            <span>{g.memberCount} members</span>
+                          )}
+                        </td>
+                        <td>
+                          {g.source === 'Product' ? (
+                            <span className="pill product">
+                              {g.origin?.product} {g.origin?.kind}
                             </span>
                           ) : (
-                            <span className="pill status-Pending">
-                              <span className="dot" />No access
-                            </span>
+                            <span className="pill type-IDP">SCIM / IDP</span>
                           )}
                         </td>
                         <td>
@@ -112,39 +122,26 @@ export function GroupsPage() {
                         <td className="actions-cell">
                           <RowMenu
                             items={[
-                              {
-                                label: 'View members',
-                                onClick: () =>
-                                  toast('Member directory not implemented in this mock', 'success'),
-                              },
-                              {
-                                label: 'Manage assignments',
-                                onClick: () =>
-                                  navigate({
-                                    pathname: '/assignments',
-                                    search: `?principal=group:${g.id}`,
-                                  }),
-                              },
-                              count > 0
-                                ? {
-                                    label: 'Revoke all access',
-                                    danger: true,
-                                    onClick: () =>
-                                      confirmAction({
-                                        title: 'Revoke all access?',
-                                        message: `This removes all ${count} assignment(s) for ${g.name}.`,
-                                        confirmText: 'Revoke all',
-                                        danger: true,
-                                        onConfirm: () => {
-                                          deleteAssignmentsForPrincipal('group', g.id);
-                                          toast(`Revoked all access for ${g.name}`, 'success');
-                                        },
-                                      }),
-                                  }
-                                : {
-                                    label: 'Add assignment',
-                                    onClick: () => setAddingFor(g),
-                                  },
+                              { label: 'Add assignment', onClick: () => setAddingFor(g) },
+                              ...(count > 0
+                                ? [
+                                    {
+                                      label: 'Revoke all access',
+                                      danger: true,
+                                      onClick: () =>
+                                        confirmAction({
+                                          title: 'Revoke all access?',
+                                          message: `This removes all ${count} assignment(s) for ${g.name}.`,
+                                          confirmText: 'Revoke all',
+                                          danger: true,
+                                          onConfirm: () => {
+                                            deleteAssignmentsForPrincipal('group', g.id);
+                                            toast(`Revoked all access for ${g.name}`, 'success');
+                                          },
+                                        }),
+                                    },
+                                  ]
+                                : []),
                             ]}
                           />
                         </td>

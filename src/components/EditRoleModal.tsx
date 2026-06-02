@@ -10,11 +10,14 @@ import { CapabilityMatrix } from './CapabilityMatrix';
 interface EditRoleModalProps {
   role: Role;
   onClose: () => void;
+  /** Force read-only details even for a custom role (e.g. opened by clicking the name). */
+  readOnly?: boolean;
 }
 
-export function EditRoleModal({ role, onClose }: EditRoleModalProps) {
+export function EditRoleModal({ role, onClose, readOnly: forcedReadOnly = false }: EditRoleModalProps) {
   const updateRole = useStore((s) => s.updateRole);
-  const readOnly = role.type === 'Built-in';
+  // Built-in roles are always read-only; custom roles are read-only only when opened for viewing.
+  const readOnly = forcedReadOnly || role.type === 'Built-in';
 
   const [name, setName] = useState(role.name);
   const [description, setDescription] = useState(role.description);

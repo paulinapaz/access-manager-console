@@ -64,6 +64,16 @@ export function ScopePicker({ scopes, value, onChange }: ScopePickerProps) {
                   <div className="opt-title">{s.name}</div>
                   <div className="opt-sub">{s.kind}</div>
                 </div>
+                {s.origin && (
+                  <div className="opt-meta">
+                    <span
+                      className="pill product"
+                      title={`This is the ${s.origin.kind} as a scope — you are granting access to its resources. Its members are selectable separately on the Principals step.`}
+                    >
+                      {s.origin.kind} — its resources
+                    </span>
+                  </div>
+                )}
               </div>
             );
           })

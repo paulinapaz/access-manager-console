@@ -13,6 +13,7 @@ import { RowMenu } from '@/components/RowMenu';
 import { EmptyRow } from '@/components/EmptyRow';
 import { AddServiceUserModal } from '@/components/AddServiceUserModal';
 import { EditServiceUserModal } from '@/components/EditServiceUserModal';
+import { AddAssignmentModal } from '@/components/AddAssignmentModal';
 import type { ServiceUser } from '@/types';
 
 export function ServiceUsersPage() {
@@ -24,6 +25,7 @@ export function ServiceUsersPage() {
   const [query, setQuery] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<ServiceUser | null>(null);
+  const [addingFor, setAddingFor] = useState<ServiceUser | null>(null);
 
   const assignmentCountById = useMemo(() => {
     const map = new Map<string, number>();
@@ -138,6 +140,7 @@ export function ServiceUsersPage() {
                         <td className="actions-cell">
                           <RowMenu
                             items={[
+                              { label: 'Add assignment', onClick: () => setAddingFor(u) },
                               { label: 'Edit service user', onClick: () => setEditing(u) },
                               u.status === 'Active'
                                 ? {
@@ -171,6 +174,12 @@ export function ServiceUsersPage() {
 
       {showAdd && <AddServiceUserModal onClose={() => setShowAdd(false)} />}
       {editing && <EditServiceUserModal serviceUser={editing} onClose={() => setEditing(null)} />}
+      {addingFor && (
+        <AddAssignmentModal
+          onClose={() => setAddingFor(null)}
+          initialPrincipal={{ type: 'service_user', id: addingFor.id }}
+        />
+      )}
     </>
   );
 }
